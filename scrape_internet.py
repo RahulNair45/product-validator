@@ -1,7 +1,10 @@
+from dotenv import load_dotenv
+import os
 import requests
 import json
 
-API_KEY = "BSAJLuYHcrha7OHCT67-oM5Ef4_X5Hn"
+load_dotenv() 
+API_KEY = os.getenv("BRAVE_API_KEY")
 
 def search(query):
     url = "https://api.search.brave.com/res/v1/web/search" # braves end point (url api listens to for requests)
