@@ -11,7 +11,7 @@ invoke_url = "https://integrate.api.nvidia.com/v1/chat/completions"  # endpoint 
 stream = False  # streaming sends back the response word by word: False means wait and get it all at once
 
 headers = {
-  "Authorization": f"Bearer nvapi-{API_KEY}",  
+  "Authorization": API_KEY,  
   "Accept": "text/event-stream" if stream else "application/json"  # tells NVIDIA what format to send the response back in (since stream is False: sends back a json)
 }
 
@@ -37,15 +37,66 @@ def classify_text(text):
 
     return payload
 
-response = requests.post(invoke_url, headers=headers, json=payload)  # sends the request to NVIDIA with your headers and payload
 
-if stream:
-    for line in response.iter_lines():  # if streaming, read the response line by line as it comes in
-        if line:
-            print(line.decode("utf-8"))  # decode each line from bytes to readable text
-else:
-    print(response.json())  # if not streaming, convert the full response to a python dictionary and print it
+file_name = "cleaned_meal prep app_discourse.json"
+cleaned_file_name = f"labled_meal_prep_disc"
+
+with open(file_name, "r") as f:
+    results = json.load(f)
+
+classified_results = []
+
+for result in results:
+    text_to_classify = result["text"]
+    data = requests.post(invoke_url, headers=headers, json=classify_text(text_to_classify)).json()  # sends the request to NVIDIA with your headers and payload
+
+    # example output of requests:
+    # ---------------------------
+    # {
+    #   'id': 'chatcmpl-a74367d2e8fc2353', 
+    #   'object': 'chat.completion', 
+    #   'created': 1782862589, 
+    #   'model': 'meta/llama-4-maverick-17b-128e-instruct', 
+    #   'choices': [
+    #       {
+    #           'index': 0, 
+    #           'message': {
+    #                           'role': 'assistant', 
+    
+    #                           'content': 'pain_point', -----> output from the model
+    # 
+    #                           'refusal': None, 'annotations': None, 'audio': None, 'function_call': None, 'tool_calls': [], 'reasoning': None, 'reasoning_content': None}, 
+    # 
+    #       'logprobs': None, 'finish_reason': 'stop', 'stop_reason': None, 'token_ids': None}
+
+    #    ], 
+    #   'service_tier': None, 
+    #   'system_fingerprint': None, 
+    #   'usage': {'
+    #       prompt_tokens': 124, 
+    #       'total_tokens': 127, 
+    #       'completion_tokens': 3, 
+    #       'prompt_tokens_details': None
+    #   }, 
+    #   'prompt_logprobs': None, 
+    #   'prompt_token_ids': None, 
+    #   'kv_transfer_params': None
+    #  }
+
+    # print(data)
+
+    classified_text = data['choices'][0]['message']['content'].strip()
+    result_with_label = result
+    result_with_label['label'] = classified_text
+    classified_results.append(result_with_label)
 
 
-# stuff to do
-# loop through the cleaned json, read the text blurb, give a label to the json and then update the full json with these labels
+
+with open(cleaned_file_name, "w") as f:
+    json.dump(classified_results, f, indent=2)  
+
+
+# Filter out irrelevant results — now that everything is labeled, drop anything marked irrelevant from the dataset
+# Group by label — separate all pain_points together, feature_requests together, praise together
+# Summarize each group — send each group to the LLM and ask it to summarize the key themes into a concise list
+# Output a final report — a clean JSON or printed summary that answers "should I build this?"
